@@ -1,0 +1,13 @@
+{
+  "name": "shenjimiaosuan-server",
+  "version": "2.0.0",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "axios": "^1.6.0",
+    "lunar-javascript": "^1.2.74",
+    "uuid": "^9.0.0"
+  }
+}

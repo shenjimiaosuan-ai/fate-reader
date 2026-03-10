@@ -1,0 +1,34 @@
+[
+  {
+    "id": "c88c6372-f8e6-4ddd-9563-6ef21b5c43e6",
+    "deviceId": "test_device_123",
+    "createdAt": "2026-03-09T08:33:58.424Z",
+    "balance": 0,
+    "totalSpent": 0,
+    "dailyFreeUsed": {
+      "normal_2026-03-09": 1
+    },
+    "orders": []
+  },
+  {
+    "id": "90be1f6b-5237-4e13-8bde-9bf9bc772ffc",
+    "deviceId": "device_1773045283125_nxodby8cg",
+    "createdAt": "2026-03-09T08:34:43.229Z",
+    "balance": 0,
+    "totalSpent": 0,
+    "dailyFreeUsed": {},
+    "orders": []
+  },
+  {
+    "id": "aabcb703-1558-493d-b7e7-11a2cbaa1892",
+    "deviceId": "device_1773049080421_tf7i29149",
+    "createdAt": "2026-03-09T09:38:00.471Z",
+    "balance": 0,
+    "totalSpent": 0,
+    "dailyFreeUsed": {
+      "deep_2026-03-10": 1,
+      "normal_2026-03-10": 1
+    },
+    "orders": []
+  }
+]

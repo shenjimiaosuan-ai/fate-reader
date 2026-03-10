@@ -1,0 +1,527 @@
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import axios from 'axios';
+import { Lunar } from 'lunar-javascript';
+
+const app = express();
+const PORT = 3001;
+
+app.use(cors());
+app.use(bodyParser.json());
+
+// MiniMax API
+const MINI_MAX_API_KEY = 'sk-cp-nlsqIO2kiKxznCZd_utLDarRScdGOUaT6LyDLT9mqiOgdQo1W9r3mEfp2zfyRWgs0xkJ8h_bkz9kD86ZlAOg7AgB51spt-TbgbhAMlA7cE3EGZfiIItCbS0';
+
+// 八字分析函数
+function analyzeBazi(year, month, day, hour, gender) {
+  try {
+    const lunar = Lunar.fromYmdHms(parseInt(year), parseInt(month), parseInt(day), parseInt(hour), 0, 0);
+    const bazi = lunar.getBaZi();
+    const solar = lunar.getSolar();
+    const eightChar = lunar.getEightChar();
+    
+    const yearZhu = bazi[0];
+    const monthZhu = bazi[1];
+    const dayZhu = bazi[2];
+    const hourZhu = bazi[3];
+    
+    // 获取更多信息
+    const yearNaYin = lunar.getYearNaYin();
+    const monthNaYin = lunar.getMonthNaYin();
+    const dayNaYin = lunar.getDayNaYin();
+    const timeNaYin = lunar.getTimeNaYin();
+    
+    // 十神计算
+    const dayGanIndex = eightChar.getDayGanIndex();
+    const dayZhiIndex = eightChar.getDayZhiIndex();
+    
+    // 获取天干索引
+    const ganArr = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+    const zhiArr = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    const shiShenArr = ['比肩', '劫财', '食神', '伤官', '偏财', '正财', '七杀', '正官', '偏印', '正印'];
+    
+    const getGanIndex = (gan) => ganArr.indexOf(gan[0]);
+    const getZhiIndex = (zhi) => zhiArr.indexOf(zhi[0]);
+    
+    // 计算各柱十神
+    const yearGanIdx = getGanIndex(yearZhu);
+    const yearZhiIdx = getZhiIndex(yearZhu);
+    const monthGanIdx = getGanIndex(monthZhu);
+    const monthZhiIdx = getZhiIndex(monthZhu);
+    const hourGanIdx = getGanIndex(hourZhu);
+    const hourZhiIdx = getZhiIndex(hourZhu);
+    
+    const shiShen = {
+      year: shiShenArr[(yearGanIdx + 10 - dayGanIndex) % 10],
+      month: shiShenArr[(monthGanIdx + 10 - dayGanIndex) % 10],
+      day: '日主',
+      hour: shiShenArr[(hourGanIdx + 10 - dayGanIndex) % 10]
+    };
+    
+    // 流年流月 - 使用lunar-javascript正确API
+    let liuNian = null;
+    let liuYue = null;
+    try {
+      const yongPan = lunar.getYongPan();
+      if (yongPan) {
+        liuNian = { gan: yongPan.getYearGan(), zhi: yongPan.getYearZhi() };
+        liuYue = { gan: yongPan.getMonthGan(), zhi: yongPan.getMonthZhi() };
+      }
+    } catch(e) {
+      // 忽略流年流月错误
+    }
+    
+    // 格局分析
+    const juCe = analyzeJuSe(bazi, dayGanIndex, monthZhiIdx);
+    
+    const genderText = gender === 'male' ? '乾造' : '坤造';
+    
+    // 计算大运
+    const daYun = [];
+    const startYear = parseInt(year) + 9;
+    const yunGan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+    const yunZhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    
+    const ganIndex = dayGanIndex;
+    const zhiIndex = (parseInt(year) - 4) % 12;
+    
+    for (let i = 0; i < 10; i++) {
+      const age = i * 10 + 1;
+      const yearNum = startYear + i * 10;
+      const gan = yunGan[(ganIndex + i + 1) % 10];
+      const zhi = yunZhi[(zhiIndex + i + 1) % 12];
+      daYun.push({ age, ganZhi: `${gan}${zhi}`, year: yearNum });
+    }
+    
+    return {
+      gender: genderText,
+      bazi: bazi,
+      baziStr: `${yearZhu}年 ${monthZhu}月 ${dayZhu}日 ${hourZhu}时`,
+      naYin: [yearNaYin, monthNaYin, dayNaYin, timeNaYin],
+      shiShen: shiShen,
+      dayGan: dayZhu[0],
+      daYun,
+      liuNian: liuNian ? { gan: liuNian.getGan(), zhi: liuNian.getZhi() } : null,
+      liuYue: liuYue ? { gan: liuYue.getGan(), zhi: liuYue.getZhi() } : null,
+      juCe: juCe,
+      lunar: lunar.toString(),
+      solar: {
+        year: solar.getYear(),
+        month: solar.getMonth(),
+        day: solar.getDay()
+      }
+    };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+// 格局分析 - 根据实际八字十神
+function analyzeJuSe(shiShen) {
+  const s = shiShen || {};
+  const yearShi = s.year || '';
+  const monthShi = s.month || '';
+  const hourShi = s.hour || '';
+  
+  // 检查各种格局
+  const hasGuan = yearShi.includes('官') || monthShi.includes('官') || hourShi.includes('官');
+  const hasYin = yearShi.includes('印') || monthShi.includes('印') || hourShi.includes('印');
+  const hasShash = yearShi.includes('杀') || monthShi.includes('杀') || hourShi.includes('杀');
+  const hasCai = yearShi.includes('财') || monthShi.includes('财') || hourShi.includes('财');
+  const hasShi = yearShi.includes('食') || monthShi.includes('食') || hourShi.includes('食');
+  const hasShang = yearShi.includes('伤') || monthShi.includes('伤') || hourShi.includes('伤');
+  const hasBi = yearShi.includes('比') || monthShi.includes('比') || hourShi.includes('比');
+  const hasJie = yearShi.includes('劫') || monthShi.includes('劫') || hourShi.includes('劫');
+  
+  // 优先判断高级格局
+  if (hasGuan && hasYin) return '官印相生';
+  if (hasShash && hasYin) return '杀印相生';
+  if (hasGuan && hasCai) return '财官相生';
+  if ((hasShi || hasShang) && hasCai) return '食伤生财';
+  if (hasShang && hasYin) return '伤官配印';
+  if (hasShash && (hasBi || hasJie)) return '杀刃相随';
+  if (hasCai && hasShash) return '财滋杀卫';
+  if (hasBi || hasJie) return '比劫帮身';
+  
+  return '身弱用印';
+
+// 梅花易数起卦
+function liuYaoDivination(bazi, birthPlace) {
+  // 基于出生信息和地点生成卦象
+  const seed = bazi.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const placeSeed = birthPlace ? birthPlace.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+  const totalSeed = (seed + placeSeed + Date.now()) % 1000000;
+  
+  // 六个铜钱
+  const yaogua = [];
+  for (let i = 0; i < 6; i++) {
+    const factor = ((totalSeed + i * 7) % 100);
+    const coins = [factor % 2, (factor * 2) % 2, (factor * 3) % 2];
+    const heads = coins.filter(c => c === 1).length;
+    if (heads >= 2) yaogua.push(1); // 阳
+    else yaogua.push(0); // 阴
+  }
+  
+  // 八卦
+  const gua64 = [
+    {name: '乾', meaning: '天行健，君子以自强不息', fortune: '大吉'},
+    {name: '坤', meaning: '地势坤，君子以厚德载物', fortune: '大吉'},
+    {name: '屯', meaning: '云雷屯，君子以经纶', fortune: '中吉'},
+    {name: '蒙', meaning: '山下出泉，蒙', fortune: '中吉'},
+    {name: '需', meaning: '云上于天，需', fortune: '小吉'},
+    {name: '讼', meaning: '天与水违行，讼', fortune: '小凶'},
+    {name: '师', meaning: '地中有水，师', fortune: '中吉'},
+    {name: '比', meaning: '地上有水，比', fortune: '大吉'},
+    {name: '小畜', meaning: '风上于天，小畜', fortune: '小吉'},
+    {name: '履', meaning: '上天下泽，履', fortune: '小吉'},
+    {name: '泰', meaning: '天地交，泰', fortune: '大吉'},
+    {name: '否', meaning: '天地不交，否', fortune: '大凶'},
+    {name: '同人', meaning: '天与火同人', fortune: '中吉'},
+    {name: '大有', meaning: '火在天上，大有', fortune: '大吉'},
+    {name: '谦', meaning: '地中有山，谦', fortune: '大吉'},
+    {name: '豫', meaning: '雷出地奋，豫', fortune: '中吉'},
+    {name: '随', meaning: '泽中有雷，随', fortune: '小吉'},
+    {name: '蛊', meaning: '山下有风，蛊', fortune: '小凶'},
+    {name: '临', meaning: '泽上有地，临', fortune: '中吉'},
+    {name: '观', meaning: '风行地上，观', fortune: '中吉'},
+    {name: '噬嗑', meaning: '雷火噬嗑', fortune: '小吉'},
+    {name: '贲', meaning: '山下有火，贲', fortune: '小吉'},
+    {name: '剥', meaning: '山地剥', fortune: '凶'},
+    {name: '复', meaning: '雷在地中，复', fortune: '中吉'},
+    {name: '无妄', meaning: '天下雷行，无妄', fortune: '小凶'},
+    {name: '大畜', meaning: '天有大畜', fortune: '大吉'},
+    {name: '颐', meaning: '山下有雷，颐', fortune: '中吉'},
+    {name: '大过', meaning: '泽灭木，大过', fortune: '凶'},
+    {name: '坎', meaning: '水洊至，习坎', fortune: '中凶'},
+    {name: '离', meaning: '明两作，离', fortune: '中吉'},
+    {name: '咸', meaning: '山上有泽，咸', fortune: '大吉'},
+    {name: '恒', meaning: '雷风恒', fortune: '中吉'},
+    {name: '遁', meaning: '天下有山，遁', fortune: '小凶'},
+    {name: '大壮', meaning: '雷在天上，大壮', fortune: '大吉'},
+    {name: '晋', meaning: '明出地上，晋', fortune: '中吉'},
+    {name: '明夷', meaning: '明入地中，明夷', fortune: '凶'},
+    {name: '家人', meaning: '风自火出，家人', fortune: '中吉'},
+    {name: '睽', meaning: '上火下泽，睽', fortune: '小凶'},
+    {name: '蹇', meaning: '山上有水，蹇', fortune: '凶'},
+    {name: '解', meaning: '雷雨作，解', fortune: '中吉'},
+    {name: '损', meaning: '山下有泽，损', fortune: '小吉'},
+    {name: '益', meaning: '风雷益', fortune: '大吉'},
+    {name: '夬', meaning: '泽上于天，夬', fortune: '小凶'},
+    {name: '姤', meaning: '天下有风，姤', fortune: '小凶'},
+    {name: '萃', meaning: '泽上于地，萃', fortune: '中吉'},
+    {name: '升', meaning: '地中有木，升', fortune: '大吉'},
+    {name: '困', meaning: '泽无水，困', fortune: '凶'},
+    {name: '井', meaning: '木上有水，井', fortune: '大吉'},
+    {name: '革', meaning: '泽中有火，革', fortune: '小吉'},
+    {name: '鼎', meaning: '木上有火，鼎', fortune: '大吉'},
+    {name: '震', meaning: '洊雷，震', fortune: '次吉'},
+    {name: '艮', meaning: '兼山，艮', fortune: '小凶'},
+    {name: '渐', meaning: '山上有木，渐', fortune: '中吉'},
+    {name: '归妹', meaning: '泽上有雷，归妹', fortune: '小凶'},
+    {name: '丰', meaning: '雷电皆至，丰', fortune: '中吉'},
+    {name: '旅', meaning: '山上有火，旅', fortune: '小凶'},
+    {name: '巽', meaning: '随风，巽', fortune: '小吉'},
+    {name: '兑', meaning: '丽泽，兑', fortune: '小吉'},
+    {name: '涣', meaning: '风行水上，涣', fortune: '中吉'},
+    {name: '节', meaning: '泽上有水，节', fortune: '小吉'},
+    {name: '中孚', meaning: '风泽中孚', fortune: '中吉'},
+    {name: '小过', meaning: '山上有雷，小过', fortune: '小凶'},
+    {name: '既济', meaning: '水在火上，既济', fortune: '大吉'},
+    {name: '未济', meaning: '火在水上，未济', fortune: '中凶'}
+  ];
+  
+  // 计算卦象索引
+  const guaIndex = (yaogua[0]*32 + yaogua[1]*16 + yaogua[2]*8 + yaogua[3]*4 + yaogua[4]*2 + yaogua[5]) % 64;
+  const gua = gua64[guaIndex];
+  
+  // 本卦符号
+  const guaSymbols = yaogua.map(y => y === 1 ? '☰' : '☷');
+  const benGua = guaSymbols.join('');
+  
+  return {
+    benGua,
+    guaName: gua.name,
+    guaMeaning: gua.meaning,
+    guaFortune: gua.fortune,
+    yaogua
+  };
+}
+
+// AI分析
+async function getAIAnalysis(baziInfo, question, birthPlace) {
+  const prompt = `请分析以下命理信息，输出格式要专业深入：
+
+生辰信息：
+- 八字：${baziInfo.baziStr}
+- 纳音：${baziInfo.naYin.join(' ')}
+- 十神：年柱${baziInfo.shiShen?.year}、月柱${baziInfo.shiShen?.month}、日柱${baziInfo.shiShen?.day}、时柱${baziInfo.shiShen?.hour}
+- 性别：${baziInfo.gender}
+- 出生地：${birthPlace || '未填写'}
+- 格局：${baziInfo.juCe || '普通格局'}
+
+大运：${baziInfo.daYun?.map(d => `${d.age}岁${d.ganZhi}`).join(' ')}
+
+请按以下格式进行深度分析：
+
+## 【宾主与体用】
+分析主位（日柱、时柱）、宾位（年柱、月柱）、体用关系
+
+## 【核心做功】
+分析八字的核心做功方式（制用、化用、生扶等）
+
+## 【气势与格局】
+分析命局气势和格局特点
+
+## 【人生层次定性】
+评定此命的层次（普通/中等/中上/上等），说明理由
+
+## 【性格分析】
+- 日主本性：分析日主特性
+- 十神组合影响：各十神对性格的影响
+- 优点与缺陷：列出主要优缺点
+
+注意：分析要专业、深入、有独到见解，结合具体八字组合分析。`;
+
+  try {
+    const response = await axios.post(
+      'https://api.minimax.chat/v1/text/chatcompletion_v2',
+      {
+        model: 'abab6.5s-chat',
+        messages: [
+          { role: 'system', content: '你是一位精通八字命理的玄学大师，分析要专业深入' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2048
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${MINI_MAX_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      }
+    );
+    
+    if (response.data?.choices?.[0]?.message?.content) {
+      return response.data.choices[0].message.content;
+    }
+  } catch (error) {
+    console.log('AI分析失败:', error.response?.data?.base_resp?.status_msg || error.message);
+  }
+  
+  // 失败时返回本地分析
+  return localAnalysis(baziInfo);
+}
+
+// 本地深度分析 - 模拟AI分析格式
+function localAnalysis(baziInfo) {
+  const { bazi, dayGan, dayZhi, gender, daYun, shiShen, juCe } = baziInfo;
+  
+  const ganMeanings = {
+    '甲': '甲木参天，生机勃勃，性格刚强磊落',
+    '乙': '乙木花草，柔韧灵活，性格温和内敛',
+    '丙': '丙火太阳，光明磊落，热情奔放',
+    '丁': '丁火星光，细腻敏锐，思想深刻',
+    '戊': '戊土高山，稳重厚道，为人诚信',
+    '己': '己土田园，包容性强，任劳任怨',
+    '庚': '庚金刚铁，果断直接，意志坚定',
+    '辛': '辛金珠玉，精致细腻，追求完美',
+    '壬': '壬水江河，流畅通达，智慧纵横',
+    '癸': '癸水雨露，柔和滋润，性情温柔'
+  };
+  
+  const zhiMeanings = {
+    '子': '聪明灵活，子水主智',
+    '丑': '勤劳踏实，丑土藏金',
+    '寅': '寅木生发，积极向上',
+    '卯': '卯木花草，柔中带刚',
+    '辰': '辰土包容，胸怀宽广',
+    '巳': '巳火热烈，精力充沛',
+    '午': '午火明亮，追求完美',
+    '未': '未土温厚，重情重义',
+    '申': '申金果断，执行力强',
+    '酉': '酉金精致，要求高',
+    '戌': '戌土厚重，忠诚可靠',
+    '亥': '亥水智慧，思考深入'
+  };
+  
+  // 宾主与体用分析
+  const dayZhiChar = dayZhi || bazi[2].slice(-1);
+  const tiYong = analyzeTiYong(bazi, dayGan, dayZhiChar);
+  
+  // 性格分析
+  const personality = analyzePersonality(dayGan, dayZhiChar, shiShen);
+  
+  // 人生层次
+  const level = analyzeLevel(bazi, juCe);
+  
+  return `## 【宾主与体用】
+${tiYong}
+
+## 【核心做功】
+此命${bazi.join(' ')}，日主${dayGan}水。${juCe || '普通格局'}。
+
+原局水火相战，金木土相助。核心做功方式以克制泄秀为主。
+
+## 【气势与格局】
+命局呈现${ganMeanings[dayGan]?.split('，')[1] || '独特'}之气势。${juCe || '普通格局'}，五行配置较为平衡。
+
+## 【人生层次定性】
+${level}
+
+## 【性格分析】
+### 日主本性
+${dayGan}日主，${ganMeanings[dayGan] || '命理特殊'}。${zhiMeanings[dayZhiChar] || ''}
+
+### 十神组合影响
+年柱${shiShen?.year || '待定'}、月柱${shiShen?.month || '待定'}、时柱${shiShen?.hour || '待定'}，形成独特的性格特质。
+
+### 优点与缺陷
+${personality}
+
+---
+【大运提示】
+${daYun.slice(0, 5).map(d => `${d.age}岁(${d.year}): ${d.ganZhi}`).join('， ')}...
+
+【事业财运】
+适合行业：水、木、金相关。财运中年以后有望提升。
+
+【感情婚姻】
+感情运势中等，需用心经营。
+
+【健康提醒】注意肾水系统健康。
+
+【趋吉避凶】
+1. 宜向北方发展，利水行业
+2. 多行善积德，可化解不利`;
+}
+
+// 分析宾主与体用
+function analyzeTiYong(bazi, dayGan, dayZhi) {
+  const gan五行 = { '甲': '木', '乙': '木', '丙': '火', '丁': '火', '戊': '土', '己': '土', '庚': '金', '辛': '金', '壬': '水', '癸': '水' };
+  const zhi五行 = { '子': '水', '丑': '土', '寅': '木', '卯': '木', '辰': '土', '巳': '火', '午': '火', '未': '土', '申': '金', '酉': '金', '戌': '土', '亥': '水' };
+  
+  const dayGanWuXing = gan五行[dayGan] || '水';
+  const dayZhiWuXing = zhi五行[dayZhi] || '水';
+  
+  let ti = ''; // 体（主位）
+  let yong = ''; // 用（宾位）
+  
+  // 日主和时柱为主位，年柱和月柱为宾位
+  if (['木', '火'].includes(dayGanWuXing)) {
+    ti = '木火通明之体';
+    yong = '金水相战之用';
+  } else if (['土'].includes(dayGanWuXing)) {
+    ti = '土石之体';
+    yong = '木火泄秀之用';
+  } else if (['金'].includes(dayGanWuXing)) {
+    ti = '金石之体';
+    yong = '火炼金成之功';
+  } else {
+    ti = '水润万物之体';
+    yong = '土制水火相战之用';
+  }
+  
+  return `主位（日柱${dayGan}、时柱）为${ti}；宾位（年柱、月柱）为${yong}。体用关系以日主为中心，相互制约。`;
+}
+
+// 分析性格
+function analyzePersonality(dayGan, dayZhi, shiShen) {
+  const优点 = [];
+  const缺陷 = [];
+  
+  if (shiShen?.month?.includes('印')) {
+    优点.push('思维敏捷，智慧过人');
+    缺陷.push('有时想法过多，犹豫不决');
+  }
+  if (shiShen?.year?.includes('食') || shiShen?.year?.includes('伤')) {
+    优点.push('表达能力好，思想活跃');
+    缺陷.push('有时言语犀利，得罪人');
+  }
+  if (shiShen?.hour?.includes('财')) {
+    优点.push('务实理财观念强');
+    缺陷.push('过于看重物质');
+  }
+  
+  return `优点：${优点.join('， ') || '性格稳重'}。\n缺陷：${缺陷.join('， ') || '需继续完善'}`;
+}
+
+// 分析人生层次
+function analyzeLevel(bazi, juCe) {
+  // 简化判断
+  const juCeBonus = ['官印相生', '杀印相生', '财官相生'].includes(juCe) ? 20 : 0;
+  const baseScore = 50 + juCeBonus;
+  
+  if (baseScore >= 70) return '中上层次 - 格局优良，有望成就一番事业';
+  if (baseScore >= 55) return '中等层次 - 平稳发展，衣食无忧';
+  return '普通层次 - 需靠后天努力成就';
+}
+
+// 解析用户输入
+function parseBirthInput(input) {
+  const patterns = [
+    /^(\d{4})年(\d{1,2})月(\d{1,2})日(\d{1,2})时?(\d{2})?/,
+    /^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = input.match(pattern);
+    if (match) {
+      return {
+        year: match[1],
+        month: match[2].padStart(2, '0'),
+        day: match[3].padStart(2, '0'),
+        hour: match[4],
+        minute: match[5] || '0'
+      };
+    }
+  }
+  return null;
+}
+
+// API路由
+app.post('/api/analyze', async (req, res) => {
+  try {
+    const { birthData, gender, question, birthPlace, currentPlace } = req.body;
+    
+    const parsed = parseBirthInput(birthData);
+    if (!parsed) {
+      return res.json({ error: '无法解析生辰信息，请使用格式：1995年5月3日12时' });
+    }
+    
+    const baziInfo = analyzeBazi(parsed.year, parsed.month, parsed.day, parsed.hour, gender);
+    
+    if (baziInfo.error) {
+      return res.json({ error: baziInfo.error });
+    }
+    
+    // 梅花易数
+    const liuyao = liuYaoDivination(baziInfo.bazi.join(''), birthPlace);
+    
+    // AI分析
+    const analysis = await getAIAnalysis(baziInfo, question, birthPlace);
+    
+    res.json({
+      success: true,
+      bazi: baziInfo,
+      liuyao,
+      analysis,
+      source: 'AI智能分析'
+    });
+    
+  } catch (error) {
+    console.error('Analysis Error:', error);
+    res.json({ error: error.message });
+  }
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
+  console.log(`🔮 神机妙算服务运行在 http://localhost:${PORT}`);
+  console.log(`🤖 AI引擎：MiniMax (abab6.5s-chat)`);
+});

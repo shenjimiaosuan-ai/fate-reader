@@ -1,0 +1,18 @@
+{
+  "eth": {
+    "address": "0x43c234efC102C11F0c1e7B8c5c4C7968A8c73c0F",
+    "privateKey": "0xe850201772504dd831222a51e9f396d3ac0a729c56162ed872c84edd2d30418a",
+    "network": "ERC20",
+    "symbol": "USDT"
+  },
+  "trx": {
+    "address": {
+      "base58": "TByGzSd8PbzTYSDiPJ2nvJuhDFLsE1XsUh",
+      "hex": "4115F394EC1D2DC08E89BA8BF2EAEFF151E221ADCD"
+    },
+    "privateKey": "FB3C4D33C4D6CCD57010D19740A479D005FA75A4DC0896AF636A2F4DE64B476B",
+    "network": "TRC20",
+    "symbol": "USDT"
+  },
+  "created": "2026-03-10T07:30:32.040Z"
+}
