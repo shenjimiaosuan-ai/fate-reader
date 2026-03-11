@@ -293,7 +293,8 @@ function App() {
   };
 
   const generateMonteCarlo = (bazi) => {
-    const simulations = 1000; // 减少到1000次
+    // 本地模式简化 - 不进行大量模拟
+    const simulations = 100; // 大幅减少
     const results = { career: [], wealth: [], love: [], health: [], overall: [] };
     const baziStr = bazi.bazi.join('');
     const seed = baziStr.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
