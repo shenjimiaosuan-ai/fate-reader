@@ -225,28 +225,26 @@ function App() {
     setLoading(true);
     setError('');
     
-    // 本地模拟模式（管理员模式）
+    // 本地模拟模式（管理员模式）- 直接返回模拟结果
     if (isAdminMode() || !API_BASE) {
-      setLoading(false); // 先关闭loading，让UI响应
-      // 异步计算结果
-      setTimeout(() => {
-        try {
-          // 本地生成结果
-          const localBazi = generateLocalBazi(birthData, gender);
-          const monteCarlo = generateMonteCarlo(localBazi);
-          const timeline = generateTimeline(localBazi, birthYear);
-          setResult({
-            success: true,
-            bazi: localBazi,
-            monteCarlo,
-            timeline,
-            analyzeType,
-            isLocalMode: true
-          });
-        } catch (err) {
-          setError(lang === 'zh' ? '本地分析失败' : 'Local analysis failed');
-        }
-      }, 100);
+      try {
+        // 本地生成结果
+        const localBazi = generateLocalBazi(birthData, gender);
+        const monteCarlo = generateMonteCarlo(localBazi);
+        const timeline = generateTimeline(localBazi, birthYear);
+        setResult({
+          success: true,
+          bazi: localBazi,
+          monteCarlo,
+          timeline,
+          analyzeType,
+          isLocalMode: true
+        });
+      } catch (err) {
+        console.error('Local analysis error:', err);
+        setError(lang === 'zh' ? '本地分析失败: ' + err.message : 'Local analysis failed: ' + err.message);
+      }
+      setLoading(false);
       return;
     }
     
