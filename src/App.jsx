@@ -17,7 +17,17 @@ const setAdminMode = (enabled) => {
 
 // 本地生成八字（模拟）
 const generateLocalBazi = (birthData, gender) => {
-  const date = new Date(birthData.replace(' ', 'T'));
+  let date;
+  try {
+    date = new Date(birthData.replace(' ', 'T'));
+  } catch (e) {
+    // 尝试其他格式
+    date = new Date(birthData);
+  }
+  if (isNaN(date.getTime())) {
+    // 使用默认日期
+    date = new Date('1995-05-15T12:00');
+  }
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const day = date.getDate();
@@ -27,16 +37,16 @@ const generateLocalBazi = (birthData, gender) => {
   const dizhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
   
   // 简化计算
-  const yearIdx = (year - 1900) % 10;
-  const monthIdx = (month * 2 + day) % 10;
-  const dayIdx = (day * 2 + hour) % 10;
-  const hourIdx = (hour * 2) % 12;
+  const yearIdx = Math.abs((year - 1900) % 10);
+  const monthIdx = Math.abs((month * 2 + day) % 10);
+  const dayIdx = Math.abs((day * 2 + hour) % 10);
+  const hourIdx = Math.abs((hour * 2) % 12);
   
   const bazi = [
-    tiangan[yearIdx] + dizhi[(year - 1900) % 12],
-    tiangan[monthIdx] + dizhi[(month + 1) % 12],
-    tiangan[dayIdx] + dizhi[day % 12],
-    tiangan[(hourIdx + dayIdx) % 10] + dizhi[hourIdx]
+    tiangan[yearIdx] + dizhi[Math.abs((year - 1900) % 12)],
+    tiangan[monthIdx] + dizhi[Math.abs((month + 1) % 12)],
+    tiangan[dayIdx] + dizhi[Math.abs(day % 12)],
+    tiangan[Math.abs((hourIdx + dayIdx) % 10)] + dizhi[hourIdx]
   ];
   
   return {
