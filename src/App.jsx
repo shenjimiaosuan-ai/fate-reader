@@ -21,11 +21,9 @@ const generateLocalBazi = (birthData, gender) => {
   try {
     date = new Date(birthData.replace(' ', 'T'));
   } catch (e) {
-    // 尝试其他格式
     date = new Date(birthData);
   }
   if (isNaN(date.getTime())) {
-    // 使用默认日期
     date = new Date('1995-05-15T12:00');
   }
   const year = date.getFullYear();
@@ -35,14 +33,14 @@ const generateLocalBazi = (birthData, gender) => {
   
   const tiangan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
   const dizhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+  const nayin = ['海中金', '炉中火', '大林木', '路旁土', '剑锋金', '山头火', '涧下水', '城头土', '白蜡金', '杨柳木', '井泉水', '屋上土'];
   
-  // 简化计算
   const yearIdx = Math.abs((year - 1900) % 10);
   const monthIdx = Math.abs((month * 2 + day) % 10);
   const dayIdx = Math.abs((day * 2 + hour) % 10);
   const hourIdx = Math.abs((hour * 2) % 12);
   
-  const bazi = [
+  const baziArr = [
     tiangan[yearIdx] + dizhi[Math.abs((year - 1900) % 12)],
     tiangan[monthIdx] + dizhi[Math.abs((month + 1) % 12)],
     tiangan[dayIdx] + dizhi[Math.abs(day % 12)],
@@ -50,9 +48,11 @@ const generateLocalBazi = (birthData, gender) => {
   ];
   
   return {
-    bazi,
+    bazi: baziArr,
+    naYin: baziArr.map((_, i) => nayin[i % 12]),
     solar: { year, month, day, hour },
     gender,
+    juCe: '身旺用财官',
     shiShen: {
       year: ['印', '比', '食', '财'][yearIdx % 4],
       month: ['官', '财', '印', '食'][monthIdx % 4],
@@ -232,13 +232,24 @@ function App() {
         const localBazi = generateLocalBazi(birthData, gender);
         const monteCarlo = generateMonteCarlo(localBazi);
         const timeline = generateTimeline(localBazi, birthYear);
+        
+        // 本地模式生成简化结果
+        const guaNames = ['乾卦', '坤卦', '屯卦', '蒙卦', '需卦', '讼卦', '师卦', '比卦'];
+        const randomGua = guaNames[Math.floor(Math.random() * guaNames.length)];
+        
+        // 确保数据结构与API返回一致
         setResult({
           success: true,
           bazi: localBazi,
+          liuyao: { guaName: randomGua, benGua: randomGua },
+          analysis: lang === 'zh' 
+            ? '根据您的生辰八字，您命中注定具有独特的性格特质。您的日主健旺，适合通过努力实现目标。在事业方面，您具有较强的领导能力和执行力。财运方面，建议稳健经营，避免激进投资。感情方面，您对感情专一，但需要学会表达情感。健康方面，请注意脾胃保养。'
+            : 'Based on your birth chart, you have unique personality traits. Your day master is strong, suitable for achieving goals through effort. In career, you have strong leadership and execution abilities.',
           monteCarlo,
           timeline,
           analyzeType,
-          isLocalMode: true
+          isLocalMode: true,
+          isFree: true
         });
       } catch (err) {
         console.error('Local analysis error:', err);
