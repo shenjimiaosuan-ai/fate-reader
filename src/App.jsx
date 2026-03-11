@@ -129,8 +129,9 @@ function App() {
   };
 
   const getFreeInfo = () => {
-    if (!userInfo) return { normal: 0, deep: 0 };
-    return { normal: (userInfo.dailyFree?.normal?.limit || 0) - (userInfo.dailyFree?.normal?.used || 0), deep: 0 };
+    if (!userInfo) return { newUserFree: true, normal: 0, deep: 0 };
+    // 新用户免费1次，之后需付费
+    return { newUserFree: !userInfo.hasUsedFree, normal: 0, deep: 0 };
   };
 
   const freeInfo = getFreeInfo();
@@ -140,15 +141,19 @@ function App() {
 
   const handleTypeChange = (type) => {
     setAnalyzeType(type);
-    if (type === 'deep' && (!userInfo || userInfo.balance < 19.9)) {
-      handleNeedPayment('deep');
+    // 检查是否需要付费
+    const prices = { normal: 7.9, deep: 19.9, quarterly: 49.9, yearly: 89.9 };
+    const needPay = type !== 'normal' || !freeInfo.newUserFree;
+    if (needPay && (!userInfo || userInfo.balance < prices[type])) {
+      handleNeedPayment(type);
     }
   };
 
   const handleNeedPayment = async (type) => {
+    const prices = { normal: 7.9, deep: 19.9, quarterly: 49.9, yearly: 89.9 };
     try {
       const url = API_BASE ? API_BASE + '/api/order/create' : '/api/order/create';
-      const response = await axios.post(url, { deviceId, type });
+      const response = await axios.post(url, { deviceId, type, price: prices[type] || 7.9 });
       if (response.data.success) {
         setCurrentOrder(response.data.order);
         setShowPayment(true);
@@ -233,7 +238,25 @@ function App() {
 
   const handleConfirmPayment = () => { if (currentOrder) setCheckPayment(true); };
   const formatBazi = (bazi) => bazi ? bazi[0] + ' ' + bazi[1] + ' ' + bazi[2] + ' ' + bazi[3] : '';
-  const getPriceDisplay = () => analyzeType === 'normal' ? (freeInfo.normal > 0 ? { text: t(lang, 'free'), color: '#10B981' } : { text: '9.9' + t(lang, 'yuan'), color: '#EF4444' }) : { text: '19.9' + t(lang, 'yuan'), color: '#EF4444' };
+  const getPriceDisplay = () => {
+    // 新用户免费1次，之后需付费
+    if (analyzeType === 'normal') {
+      return freeInfo.newUserFree ? { text: t(lang, 'free'), color: '#10B981' } : { text: '$7.9', color: '#EF4444' };
+    }
+    // 深度推演
+    if (analyzeType === 'deep') {
+      return { text: '$19.9', color: '#EF4444' };
+    }
+    // 季度会员
+    if (analyzeType === 'quarterly') {
+      return { text: '$49.9', color: '#8B5CF6' };
+    }
+    // 年度会员
+    if (analyzeType === 'yearly') {
+      return { text: '$89.9', color: '#8B5CF6' };
+    }
+    return { text: '$7.9', color: '#EF4444' };
+  };
   const priceDisplay = getPriceDisplay();
   const getAssetUrl = (path) => API_BASE ? API_BASE + path : path;
 
@@ -250,8 +273,8 @@ function App() {
         </div>
       </header>
       <div style={styles.freeBanner}>
-        <span>{labels.dailyFree}: <strong>{freeInfo.normal}</strong></span>
-        {userInfo && userInfo.totalSpent > 0 && <span style={styles.totalSpent}>{labels.totalSpent}: {userInfo.totalSpent.toFixed(1)}</span>}
+        <span>{freeInfo.newUserFree ? (lang === 'zh' ? '新用户专享：免费1次' : 'New User: 1 Free Reading') : (lang === 'zh' ? '每日免费已用完' : 'Daily Free Used')}</span>
+        {userInfo && userInfo.totalSpent > 0 && <span style={styles.totalSpent}>{labels.totalSpent}: ${userInfo.totalSpent.toFixed(1)}</span>}
       </div>
       <div style={styles.disclaimer}>{lang === 'zh' ? labels.disclaimer : labels.disclaimerEn}</div>
       <div style={styles.intro}>{labels.intro}</div>
@@ -344,8 +367,10 @@ function App() {
           </div>
         </div>
         <div style={styles.analyzeType}>
-          <button style={{...styles.typeBtn, ...(analyzeType === 'normal' ? styles.typeBtnActive : {})}} onClick={() => setAnalyzeType('normal')}>{labels.normalAnalysis}<span style={styles.typePrice}>{freeInfo.normal > 0 ? labels.free : '9.9'}</span></button>
-          <button style={{...styles.typeBtn, ...(analyzeType === 'deep' ? styles.typeBtnActive : {})}} onClick={() => handleTypeChange('deep')}>{labels.deepAnalysis}<span style={styles.typePrice}>19.9</span></button>
+          <button style={{...styles.typeBtn, ...(analyzeType === 'normal' ? styles.typeBtnActive : {})}} onClick={() => setAnalyzeType('normal')}>{labels.normalAnalysis}<span style={styles.typePrice}>{freeInfo.newUserFree ? labels.free : '$7.9'}</span></button>
+          <button style={{...styles.typeBtn, ...(analyzeType === 'deep' ? styles.typeBtnActive : {})}} onClick={() => handleTypeChange('deep')}>{labels.deepAnalysis}<span style={styles.typePrice}>$19.9</span></button>
+          <button style={{...styles.typeBtn, ...(analyzeType === 'quarterly' ? styles.typeBtnActive : {})}} onClick={() => handleTypeChange('quarterly')}>{lang === 'zh' ? '季度会员' : 'Quarterly'}<span style={styles.typePrice}>$49.9</span></button>
+          <button style={{...styles.typeBtn, ...(analyzeType === 'yearly' ? styles.typeBtnActive : {})}} onClick={() => handleTypeChange('yearly')}>{lang === 'zh' ? '年度会员' : 'Yearly'}<span style={styles.typePrice}>$89.9</span></button>
         </div>
         <button style={{...styles.submitBtn, ...(loading ? styles.submitBtnDisabled : {})}} onClick={doAnalyze} disabled={loading}>{loading ? labels.analyzing : labels.startAnalyze + ' (' + priceDisplay.text + ')'}</button>
         {error && <div style={styles.error}>{error}</div>}

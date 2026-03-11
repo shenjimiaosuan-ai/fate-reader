@@ -30,5 +30,14 @@
       "normal_2026-03-10": 1
     },
     "orders": []
+  },
+  {
+    "id": "1337a06c-a190-46ae-905c-350d5e9e575f",
+    "deviceId": "device_1773135989482_apdkdw6z3",
+    "createdAt": "2026-03-10T09:46:29.577Z",
+    "balance": 0,
+    "totalSpent": 0,
+    "dailyFreeUsed": {},
+    "orders": []
   }
 ]
