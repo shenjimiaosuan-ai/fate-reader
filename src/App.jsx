@@ -235,10 +235,24 @@ function App() {
         const guaNames = ['乾卦', '坤卦', '屯卦', '蒙卦', '需卦', '讼卦', '师卦', '比卦'];
         const randomGua = guaNames[Math.floor(Math.random() * guaNames.length)];
         
+        // 生成大运数据
+        const daYun = [];
+        const tiangan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+        const dizhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+        for (let i = 0; i < 8; i++) {
+          const startAge = (localBazi.solar.year - birthYear) + i * 10;
+          const year = birthYear + startAge;
+          daYun.push({
+            age: startAge,
+            ganZhi: tiangan[(i + localBazi.solar.month) % 10] + dizhi[(i + localBazi.solar.day) % 12],
+            year: year.toString()
+          });
+        }
+        
         // 确保数据结构与API返回一致
         setResult({
           success: true,
-          bazi: localBazi,
+          bazi: { ...localBazi, daYun },
           liuyao: { guaName: randomGua, benGua: randomGua },
           analysis: lang === 'zh' 
             ? '根据您的生辰八字，您命中注定具有独特的性格特质。您的日主健旺，适合通过努力实现目标。在事业方面，您具有较强的领导能力和执行力。财运方面，建议稳健经营，避免激进投资。感情方面，您对感情专一，但需要学会表达情感。健康方面，请注意脾胃保养。'
