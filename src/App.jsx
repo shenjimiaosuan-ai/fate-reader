@@ -227,23 +227,26 @@ function App() {
     
     // 本地模拟模式（管理员模式）
     if (isAdminMode() || !API_BASE) {
-      try {
-        // 本地生成结果
-        const localBazi = generateLocalBazi(birthData, gender);
-        const monteCarlo = generateMonteCarlo(localBazi);
-        const timeline = generateTimeline(localBazi, birthYear);
-        setResult({
-          success: true,
-          bazi: localBazi,
-          monteCarlo,
-          timeline,
-          analyzeType,
-          isLocalMode: true
-        });
-      } catch (err) {
-        setError(lang === 'zh' ? '本地分析失败' : 'Local analysis failed');
-      }
-      setLoading(false);
+      setLoading(false); // 先关闭loading，让UI响应
+      // 异步计算结果
+      setTimeout(() => {
+        try {
+          // 本地生成结果
+          const localBazi = generateLocalBazi(birthData, gender);
+          const monteCarlo = generateMonteCarlo(localBazi);
+          const timeline = generateTimeline(localBazi, birthYear);
+          setResult({
+            success: true,
+            bazi: localBazi,
+            monteCarlo,
+            timeline,
+            analyzeType,
+            isLocalMode: true
+          });
+        } catch (err) {
+          setError(lang === 'zh' ? '本地分析失败' : 'Local analysis failed');
+        }
+      }, 100);
       return;
     }
     
@@ -269,7 +272,7 @@ function App() {
   };
 
   const generateMonteCarlo = (bazi) => {
-    const simulations = 10000;
+    const simulations = 1000; // 减少到1000次
     const results = { career: [], wealth: [], love: [], health: [], overall: [] };
     const baziStr = bazi.bazi.join('');
     const seed = baziStr.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
