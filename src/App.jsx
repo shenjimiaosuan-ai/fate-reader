@@ -178,11 +178,9 @@ function App() {
   }, [checkPayment, currentOrder, lang]);
 
   const loadUserInfo = async () => {
-    try {
-      const url = API_BASE ? API_BASE + '/api/user/info?deviceId=' + deviceId : '/api/user/info?deviceId=' + deviceId;
-      const response = await axios.get(url);
-      if (response.data.success) setUserInfo(response.data.user);
-    } catch (err) { console.error('error', err); }
+    // 跳过API调用，因为没有后端
+    // 本地模式不需要用户信息
+    return;
   };
 
   const getFreeInfo = () => {
