@@ -5,6 +5,53 @@ import { t, translations } from './i18n';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
+// 管理员密码 - 用于绕过支付
+const ADMIN_PASSWORD = 'admin123';
+
+// 检查是否为管理员模式
+const isAdminMode = () => localStorage.getItem('shenjimisuan_admin') === 'true';
+const setAdminMode = (enabled) => {
+  if (enabled) localStorage.setItem('shenjimisuan_admin', 'true');
+  else localStorage.removeItem('shenjimisuan_admin');
+};
+
+// 本地生成八字（模拟）
+const generateLocalBazi = (birthData, gender) => {
+  const date = new Date(birthData.replace(' ', 'T'));
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hour = date.getHours();
+  
+  const tiangan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+  const dizhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+  
+  // 简化计算
+  const yearIdx = (year - 1900) % 10;
+  const monthIdx = (month * 2 + day) % 10;
+  const dayIdx = (day * 2 + hour) % 10;
+  const hourIdx = (hour * 2) % 12;
+  
+  const bazi = [
+    tiangan[yearIdx] + dizhi[(year - 1900) % 12],
+    tiangan[monthIdx] + dizhi[(month + 1) % 12],
+    tiangan[dayIdx] + dizhi[day % 12],
+    tiangan[(hourIdx + dayIdx) % 10] + dizhi[hourIdx]
+  ];
+  
+  return {
+    bazi,
+    solar: { year, month, day, hour },
+    gender,
+    shiShen: {
+      year: ['印', '比', '食', '财'][yearIdx % 4],
+      month: ['官', '财', '印', '食'][monthIdx % 4],
+      day: ['日主', '财', '官', '印'][dayIdx % 4],
+      hour: ['财', '官', '印', '食'][hourIdx % 4]
+    }
+  };
+};
+
 const getDeviceId = () => {
   let deviceId = localStorage.getItem('shenjimisuan_device_id');
   if (!deviceId) {
@@ -141,6 +188,8 @@ function App() {
 
   const handleTypeChange = (type) => {
     setAnalyzeType(type);
+    // 管理员模式不需要支付
+    if (isAdminMode()) return;
     // 检查是否需要付费
     const prices = { normal: 7.9, deep: 19.9, quarterly: 49.9, yearly: 89.9 };
     const needPay = type !== 'normal' || !freeInfo.newUserFree;
@@ -165,6 +214,30 @@ function App() {
     const birthData = `${birthYear}-${String(birthMonth).padStart(2,'0')}-${String(birthDay).padStart(2,'0')} ${String(birthHour).padStart(2,'0')}:00`;
     setLoading(true);
     setError('');
+    
+    // 本地模拟模式（管理员模式）
+    if (isAdminMode() || !API_BASE) {
+      try {
+        // 本地生成结果
+        const localBazi = generateLocalBazi(birthData, gender);
+        const monteCarlo = generateMonteCarlo(localBazi);
+        const timeline = generateTimeline(localBazi, birthYear);
+        setResult({
+          success: true,
+          bazi: localBazi,
+          monteCarlo,
+          timeline,
+          analyzeType,
+          isLocalMode: true
+        });
+      } catch (err) {
+        setError(lang === 'zh' ? '本地分析失败' : 'Local analysis failed');
+      }
+      setLoading(false);
+      return;
+    }
+    
+    // 原始API调用
     try {
       const url = API_BASE ? API_BASE + '/api/analyze' : '/api/analyze';
       const response = await axios.post(url, { birthData, gender, birthPlace, analyzeType, deviceId });
@@ -270,8 +343,31 @@ function App() {
         <div style={styles.headerRight}>
           {userInfo && <div style={styles.balanceBox}><span>{labels.balance}: <strong style={{color: '#10B981'}}>{userInfo.balance.toFixed(1)}</strong></span></div>}
           <button style={styles.langSwitch} onClick={toggleLang}>{lang === 'zh' ? 'EN' : '中'}</button>
+          <button 
+            style={{...styles.langSwitch, background: isAdminMode() ? '#10B981' : '#6B7280', marginLeft: '8px', fontSize: '12px'}} 
+            onClick={() => {
+              if (isAdminMode()) {
+                setAdminMode(false);
+              } else {
+                const pwd = prompt(lang === 'zh' ? '请输入管理员密码:' : 'Enter admin password:');
+                if (pwd === ADMIN_PASSWORD) {
+                  setAdminMode(true);
+                  alert(lang === 'zh' ? '管理员模式已开启！' : 'Admin mode enabled!');
+                } else if (pwd) {
+                  alert(lang === 'zh' ? '密码错误' : 'Wrong password');
+                }
+              }
+            }}
+          >
+            {isAdminMode() ? 'Admin' : 'User'}
+          </button>
         </div>
       </header>
+      {isAdminMode() && (
+        <div style={{background: '#10B981', color: 'white', padding: '8px', textAlign: 'center', fontSize: '14px'}}>
+          {lang === 'zh' ? '🛡️ 管理员模式已开启 - 所有功能免费使用' : '🛡️ Admin Mode - All Features Free'}
+        </div>
+      )}
       <div style={styles.freeBanner}>
         <span>{freeInfo.newUserFree ? (lang === 'zh' ? '新用户专享：免费1次' : 'New User: 1 Free Reading') : (lang === 'zh' ? '每日免费已用完' : 'Daily Free Used')}</span>
         {userInfo && userInfo.totalSpent > 0 && <span style={styles.totalSpent}>{labels.totalSpent}: ${userInfo.totalSpent.toFixed(1)}</span>}
